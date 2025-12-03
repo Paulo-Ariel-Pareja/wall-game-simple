@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test StateManager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        #state-output {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>StateManager Test Suite</h1>
+    
+    <div class="test-section">
+        <h2>Test Results</h2>
+        <div id="test-results"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Manual Tests</h2>
+        <button onclick="testRoomCreated()">Test Room Created</button>
+        <button onclick="testPlayerListUpdate()">Test Player List Update</button>
+        <button onclick="testRoundStarted()">Test Round Started</button>
+        <button onclick="testWallRevealed()">Test Wall Revealed</button>
+        <button onclick="testGameEnded()">Test Game Ended</button>
+        <button onclick="showCurrentState()">Show Current State</button>
+        <button onclick="clearStateTest()">Clear State</button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Current State</h2>
+        <div id="state-output"></div>
+    </div>
+    
+    <script src="/scripts/state-manager.js"></script>
+    <script>
+        let stateManager;
+        let testResults = [];
+        
+        function addTestResult(name, passed, message = '') {
+            testResults.push({ name, passed, message });
+            updateTestResults();
+        }
+        
+        function updateTestResults() {
+            const container = document.getElementById('test-results');
+            container.innerHTML = testResults.map(result => `
+                <div class="test-result ${result.passed ? 'success' : 'error'}">
+                    <strong>${result.passed ? '✓' : '✗'} ${result.name}</strong>
+                    ${result.message ? `<br>${result.message}` : ''}
+                </div>
+            `).join('');
+        }
+        
+        function showCurrentState() {
+            const output = document.getElementById('state-output');
+            output.textContent = JSON.stringify(stateManager.getState(), null, 2);
+        }
+        
+        // Initialize StateManager
+        function initTests() {
+            try {
+                stateManager = new StateManager();
+                addTestResult('StateManager Initialization', true, 'StateManager created successfully');
+                
+                // Test initial state
+                const initialState = stateManager.getState();
+                addTestResult('Initial Screen', initialState.screen === 'home', `Screen: ${initialState.screen}`);
+                addTestResult('Initial Room Code', initialState.roomCode === null, 'Room code is null');
+                addTestResult('Initial Players', initialState.players.length === 0, 'No players initially');
+                
+                // Test state change listener
+                let listenerCalled = false;
+                stateManager.onStateChange((eventType, data, state) => {
+                    listenerCalled = true;
+                });
+                
+                stateManager.handleConnected('test-socket-123');
+                addTestResult('State Change Listener', listenerCalled, 'Listener was called on state change');
+                
+                showCurrentState();
+            } catch (error) {
+                addTestResult('StateManager Initialization', false, error.message);
+            }
+        }
+        
+        function testRoomCreated() {
+            try {
+                stateManager.handleRoomCreated('ABC123');
+                const state = stateManager.getState();
+                addTestResult('Room Created', 
+                    state.roomCode === 'ABC123' && state.screen === 'lobby',
+                    `Room: ${state.roomCode}, Screen: ${state.screen}`
+                );
+                showCurrentState();
+            } catch (error) {
+                addTestResult('Room Created', false, error.message);
+            }
+        }
+        
+        function testPlayerListUpdate() {
+            try {
+                const players = [
+                    {
+                        id: 'player-1',
+                        socketId: 'test-socket-123',
+                        name: 'Player 1',
+                        isReady: false,
+                        isHost: true,
+                        score: 0,
+                        currentHeight: null,
+                        isConnected: true
+                    },
+                    {
+                        id: 'player-2',
+                        socketId: 'socket-456',
+                        name: 'Player 2',
+                        isReady: true,
+                        isHost: false,
+                        score: 0,
+                        currentHeight: null,
+                        isConnected: true
+                    }
+                ];
+                
+                stateManager.handlePlayerListUpdated(players);
+                const state = stateManager.getState();
+                addTestResult('Player List Update',
+                    state.players.length === 2 && state.playerId === 'player-1',
+                    `Players: ${state.players.length}, Current Player ID: ${state.playerId}`
+                );
+                showCurrentState();
+            } catch (error) {
+                addTestResult('Player List Update', false, error.message);
+            }
+        }
+        
+        function testRoundStarted() {
+            try {
+                stateManager.handleRoundStarted({ roundNumber: 1, duration: 15 });
+                const state = stateManager.getState();
+                addTestResult('Round Started',
+                    state.currentRound === 1 && state.timeRemaining === 15,
+                    `Round: ${state.currentRound}, Time: ${state.timeRemaining}s`
+                );
+                showCurrentState();
+            } catch (error) {
+                addTestResult('Round Started', false, error.message);
+            }
+        }
+        
+        function testWallRevealed() {
+            try {
+                const results = [
+                    {
+                        playerId: 'player-1',
+                        playerName: 'Player 1',
+                        selectedHeight: 5,
+                        wallHole: 5,
+                        pointsEarned: 20,
+                        totalScore: 20,
+                        result: 'perfect'
+                    },
+                    {
+                        playerId: 'player-2',
+                        playerName: 'Player 2',
+                        selectedHeight: 3,
+                        wallHole: 5,
+                        pointsEarned: -5,
+                        totalScore: -5,
+                        result: 'too-low'
+                    }
+                ];
+                
+                stateManager.handleWallRevealed({ holePosition: 5, results });
+                const state = stateManager.getState();
+                addTestResult('Wall Revealed',
+                    state.lastWallHole === 5 && state.scores['player-1'] === 20,
+                    `Hole: ${state.lastWallHole}, Player 1 Score: ${state.scores['player-1']}`
+                );
+                showCurrentState();
+            } catch (error) {
+                addTestResult('Wall Revealed', false, error.message);
+            }
+        }
+        
+        function testGameEnded() {
+            try {
+                const finalScores = [
+                    {
+                        playerId: 'player-1',
+                        playerName: 'Player 1',
+                        score: 100,
+                        rank: 1,
+                        isWinner: true
+                    },
+                    {
+                        playerId: 'player-2',
+                        playerName: 'Player 2',
+                        score: 50,
+                        rank: 2,
+                        isWinner: false
+                    }
+                ];
+                
+                stateManager.handleGameEnded(finalScores);
+                const state = stateManager.getState();
+                addTestResult('Game Ended',
+                    state.screen === 'results' && state.finalScores.length === 2,
+                    `Screen: ${state.screen}, Final Scores: ${state.finalScores.length}`
+                );
+                showCurrentState();
+            } catch (error) {
+                addTestResult('Game Ended', false, error.message);
+            }
+        }
+        
+        function clearStateTest() {
+            try {
+                stateManager.clearState();
+                const state = stateManager.getState();
+                addTestResult('Clear State',
+                    state.screen === 'home' && state.roomCode === null,
+                    `Screen: ${state.screen}, Room Code: ${state.roomCode}`
+                );
+                showCurrentState();
+            } catch (error) {
+                addTestResult('Clear State', false, error.message);
+            }
+        }
+        
+        // Run tests on load
+        window.addEventListener('load', initTests);
+    </script>
+</body>
+</html>

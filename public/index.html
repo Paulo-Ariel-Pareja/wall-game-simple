@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Juego de Salto y Pared</title>
+    <link rel="stylesheet" href="/styles/main.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Pantalla de Inicio -->
+        <div id="home-screen" class="screen active">
+            <div class="logo-container">
+                <div class="logo">🧱</div>
+                <h1 class="game-title">Juego de Salto y Pared</h1>
+                <p class="game-subtitle">¡Salta a través de las paredes y gana puntos!</p>
+            </div>
+            
+            <div class="home-actions">
+                <button id="create-room-btn" class="btn btn-primary btn-large">
+                    <span class="btn-icon">➕</span>
+                    Crear Sala
+                </button>
+                
+                <div class="divider">
+                    <span>o</span>
+                </div>
+                
+                <div class="join-room-section">
+                    <input 
+                        type="text" 
+                        id="room-code-input" 
+                        class="input-field" 
+                        placeholder="Código de sala (6 caracteres)"
+                        maxlength="6"
+                        autocomplete="off"
+                    />
+                    <button id="join-room-btn" class="btn btn-secondary btn-large" disabled>
+                        <span class="btn-icon">🚪</span>
+                        Unirse a Sala
+                    </button>
+                </div>
+            </div>
+            
+            <div class="error-message" id="home-error"></div>
+        </div>
+
+        <!-- Pantalla de Lobby -->
+        <div id="lobby-screen" class="screen">
+            <div class="lobby-header">
+                <h2 class="lobby-title">Sala de Espera</h2>
+                <div class="room-code-container">
+                    <label class="room-code-label">Código de Sala:</label>
+                    <div class="room-code-display">
+                        <span id="room-code-display" class="room-code-text">------</span>
+                        <button id="copy-code-btn" class="btn-icon-small" title="Copiar código">
+                            📋
+                        </button>
+                    </div>
+                    <div id="copy-feedback" class="copy-feedback">¡Copiado!</div>
+                </div>
+            </div>
+
+            <div class="lobby-content">
+                <!-- Sección de nombre de jugador -->
+                <div class="player-name-section">
+                    <label for="player-name-input" class="input-label">Tu Nombre:</label>
+                    <input 
+                        type="text" 
+                        id="player-name-input" 
+                        class="input-field" 
+                        placeholder="Ingresa tu nombre (2-20 caracteres)"
+                        maxlength="20"
+                        autocomplete="off"
+                    />
+                    <div class="error-message" id="name-error"></div>
+                </div>
+
+                <!-- Lista de jugadores -->
+                <div class="players-section">
+                    <h3 class="section-title">
+                        Jugadores 
+                        <span id="player-count" class="player-count">(0)</span>
+                    </h3>
+                    <div id="players-list" class="players-list">
+                        <!-- Los jugadores se agregarán dinámicamente aquí -->
+                    </div>
+                </div>
+
+                <!-- Botón de listo -->
+                <div class="ready-section">
+                    <button id="ready-btn" class="btn btn-primary btn-large" disabled>
+                        <span class="btn-icon">✓</span>
+                        Estoy Listo
+                    </button>
+                    <p class="ready-info" id="ready-info">
+                        Esperando que todos los jugadores estén listos...
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pantalla de Juego -->
+        <div id="game-screen" class="screen">
+            <div id="player-name-display" class="player-name-display"></div>
+            
+            <div class="game-header">
+                <div class="round-info">
+                    <span class="round-label">Ronda</span>
+                    <span id="round-display" class="round-number">1/10</span>
+                </div>
+                <div class="timer-container">
+                    <div id="timer-display" class="timer">15</div>
+                    <div class="timer-label">segundos</div>
+                </div>
+            </div>
+
+            <div class="game-content">
+                <div class="game-main-area">
+                <!-- Visualización de la pared -->
+                <div class="wall-container">
+                    <div id="wall-display" class="wall">
+                        <div class="wall-level" data-level="10">
+                            <span class="level-number">10</span>
+                            <div class="level-bar"></div>
+                        </div>
+                        <div class="wall-level" data-level="9">
+                            <span class="level-number">9</span>
+                            <div class="level-bar"></div>
+                        </div>
+                        <div class="wall-level" data-level="8">
+                            <span class="level-number">8</span>
+                            <div class="level-bar"></div>
+                        </div>
+                        <div class="wall-level" data-level="7">
+                            <span class="level-number">7</span>
+                            <div class="level-bar"></div>
+                        </div>
+                        <div class="wall-level" data-level="6">
+                            <span class="level-number">6</span>
+                            <div class="level-bar"></div>
+                        </div>
+                        <div class="wall-level" data-level="5">
+                            <span class="level-number">5</span>
+                            <div class="level-bar"></div>
+                        </div>
+                        <div class="wall-level" data-level="4">
+                            <span class="level-number">4</span>
+                            <div class="level-bar"></div>
+                        </div>
+                        <div class="wall-level" data-level="3">
+                            <span class="level-number">3</span>
+                            <div class="level-bar"></div>
+                        </div>
+                        <div class="wall-level" data-level="2">
+                            <span class="level-number">2</span>
+                            <div class="level-bar"></div>
+                        </div>
+                        <div class="wall-level" data-level="1">
+                            <span class="level-number">1</span>
+                            <div class="level-bar"></div>
+                        </div>
+                    </div>
+                    <div id="players-positions" class="players-positions"></div>
+                </div>
+
+                    <!-- Botones de selección de altura -->
+                    <div class="height-selection">
+                        <div class="selection-title">Selecciona tu altura de salto:</div>
+                        <div class="height-buttons">
+                            <button class="height-btn" data-height="10">10</button>
+                            <button class="height-btn" data-height="9">9</button>
+                            <button class="height-btn" data-height="8">8</button>
+                            <button class="height-btn" data-height="7">7</button>
+                            <button class="height-btn" data-height="6">6</button>
+                            <button class="height-btn" data-height="5">5</button>
+                            <button class="height-btn" data-height="4">4</button>
+                            <button class="height-btn" data-height="3">3</button>
+                            <button class="height-btn" data-height="2">2</button>
+                            <button class="height-btn" data-height="1">1</button>
+                        </div>
+                        <div id="selection-feedback" class="selection-feedback"></div>
+                    </div>
+                </div>
+
+                <!-- Tabla de puntuaciones -->
+                <div class="scores-section">
+                    <h3 class="scores-title">Puntuaciones</h3>
+                    <div id="scores-table" class="scores-table">
+                        <!-- Las puntuaciones se agregarán dinámicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pantalla de Resultados -->
+        <div id="results-screen" class="screen">
+            <div class="results-header">
+                <div class="trophy-icon">🏆</div>
+                <h2 class="results-title">Resultados Finales</h2>
+                <p class="results-subtitle">¡El juego ha terminado!</p>
+            </div>
+
+            <div class="results-content">
+                <!-- Tabla de clasificación -->
+                <div class="leaderboard">
+                    <h3 class="leaderboard-title">Clasificación</h3>
+                    <div id="leaderboard-list" class="leaderboard-list">
+                        <!-- Los resultados se agregarán dinámicamente aquí -->
+                    </div>
+                </div>
+
+                <!-- Sección de reinicio -->
+                <div class="restart-section">
+                    <button id="restart-btn" class="btn btn-primary btn-large">
+                        <span class="btn-icon">🔄</span>
+                        Jugar de Nuevo
+                    </button>
+                    <div id="restart-status" class="restart-status">
+                        <p class="restart-status-text">
+                            <span id="restart-count">0</span> de <span id="restart-total">0</span> jugadores quieren jugar de nuevo
+                        </p>
+                        <div class="restart-progress">
+                            <div id="restart-progress-bar" class="restart-progress-bar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/scripts/validators.js"></script>
+    <script src="/scripts/game-client.js"></script>
+    <script src="/scripts/state-manager.js"></script>
+    <script src="/scripts/ui-controller.js"></script>
+</body>
+</html>

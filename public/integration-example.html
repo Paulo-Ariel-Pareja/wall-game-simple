@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StateManager + GameClient Integration Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .panel h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .state-display {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .event-log {
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 3px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .event-item {
+            padding: 5px;
+            margin: 3px 0;
+            border-left: 3px solid #007bff;
+            background: white;
+        }
+        .event-time {
+            color: #666;
+            font-size: 10px;
+        }
+        button {
+            padding: 8px 16px;
+            margin: 5px;
+            cursor: pointer;
+            border: none;
+            border-radius: 3px;
+            background: #007bff;
+            color: white;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 StateManager + GameClient Integration</h1>
+    <p>Este ejemplo muestra cómo el StateManager y GameClient trabajan juntos.</p>
+    
+    <div id="connection-status" class="status disconnected">
+        ⚠️ Desconectado
+    </div>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>🎯 Actions</h2>
+            <div>
+                <button id="connect-btn" onclick="connectToServer()">Conectar al Servidor</button>
+                <button id="disconnect-btn" onclick="disconnectFromServer()" disabled>Desconectar</button>
+            </div>
+            <div>
+                <button onclick="createRoom()" disabled id="create-room-btn">Crear Sala</button>
+                <button onclick="simulatePlayerJoin()" disabled id="simulate-join-btn">Simular Jugador Unido</button>
+            </div>
+            <div>
+                <button onclick="simulateRoundStart()" disabled id="simulate-round-btn">Simular Inicio de Ronda</button>
+                <button onclick="simulateWallReveal()" disabled id="simulate-wall-btn">Simular Revelación</button>
+            </div>
+            <div>
+                <button onclick="clearAllState()">Limpiar Estado</button>
+            </div>
+            
+            <h3>📊 Event Log</h3>
+            <div id="event-log" class="event-log"></div>
+        </div>
+        
+        <div class="panel">
+            <h2>📦 Current State</h2>
+            <div id="state-display" class="state-display"></div>
+        </div>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/scripts/game-client.js"></script>
+    <script src="/scripts/state-manager.js"></script>
+    <script>
+        let gameClient;
+        let stateManager;
+        let eventLog = [];
+        
+        function logEvent(message, data = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            eventLog.unshift({ timestamp, message, data });
+            if (eventLog.length > 50) eventLog.pop();
+            updateEventLog();
+        }
+        
+        function updateEventLog() {
+            const container = document.getElementById('event-log');
+            container.innerHTML = eventLog.map(event => `
+                <div class="event-item">
+                    <span class="event-time">${event.timestamp}</span> - ${event.message}
+                    ${event.data ? `<br><small>${JSON.stringify(event.data)}</small>` : ''}
+                </div>
+            `).join('');
+        }
+        
+        function updateStateDisplay() {
+            const display = document.getElementById('state-display');
+            display.textContent = JSON.stringify(stateManager.getState(), null, 2);
+        }
+        
+        function updateConnectionStatus(connected) {
+            const status = document.getElementById('connection-status');
+            if (connected) {
+                status.className = 'status connected';
+                status.textContent = '✅ Conectado';
+            } else {
+                status.className = 'status disconnected';
+                status.textContent = '⚠️ Desconectado';
+            }
+            
+            // Update button states
+            document.getElementById('connect-btn').disabled = connected;
+            document.getElementById('disconnect-btn').disabled = !connected;
+            document.getElementById('create-room-btn').disabled = !connected;
+            document.getElementById('simulate-join-btn').disabled = !connected;
+            document.getElementById('simulate-round-btn').disabled = !connected;
+            document.getElementById('simulate-wall-btn').disabled = !connected;
+        }
+        
+        function initializeApp() {
+            // Create StateManager
+            stateManager = new StateManager();
+            logEvent('StateManager initialized');
+            
+            // Create GameClient
+            gameClient = new GameClient();
+            logEvent('GameClient initialized');
+            
+            // Connect StateManager to GameClient events
+            gameClient.on('connected', (data) => {
+                stateManager.handleConnected(data.socketId);
+                logEvent('Connected to server', data);
+                updateConnectionStatus(true);
+                updateStateDisplay();
+            });
+            
+            gameClient.on('disconnected', (data) => {
+                stateManager.handleDisconnected(data);
+                logEvent('Disconnected from server', data);
+                updateConnectionStatus(false);
+                updateStateDisplay();
+            });
+            
+            gameClient.on('room-created', (roomCode) => {
+                stateManager.handleRoomCreated(roomCode);
+                logEvent('Room created', { roomCode });
+                updateStateDisplay();
+            });
+            
+            gameClient.on('room-joined', (roomData) => {
+                stateManager.handleRoomJoined(roomData);
+                logEvent('Joined room', roomData);
+                updateStateDisplay();
+            });
+            
+            gameClient.on('player-list-updated', (players) => {
+                stateManager.handlePlayerListUpdated(players);
+                logEvent('Player list updated', { count: players.length });
+                updateStateDisplay();
+            });
+            
+            gameClient.on('game-started', () => {
+                stateManager.handleGameStarted();
+                logEvent('Game started');
+                updateStateDisplay();
+            });
+            
+            gameClient.on('round-started', (data) => {
+                stateManager.handleRoundStarted(data);
+                logEvent('Round started', data);
+                updateStateDisplay();
+            });
+            
+            gameClient.on('wall-revealed', (data) => {
+                stateManager.handleWallRevealed(data);
+                logEvent('Wall revealed', { hole: data.holePosition });
+                updateStateDisplay();
+            });
+            
+            gameClient.on('game-ended', (finalScores) => {
+                stateManager.handleGameEnded(finalScores);
+                logEvent('Game ended', { players: finalScores.length });
+                updateStateDisplay();
+            });
+            
+            // Listen to state changes
+            stateManager.onStateChange((eventType, data, state) => {
+                console.log('State changed:', eventType, data);
+            });
+            
+            updateStateDisplay();
+        }
+        
+        function connectToServer() {
+            gameClient.connect();
+            logEvent('Connecting to server...');
+        }
+        
+        function disconnectFromServer() {
+            gameClient.disconnect();
+            logEvent('Disconnecting from server...');
+        }
+        
+        function createRoom() {
+            gameClient.createRoom();
+            logEvent('Creating room...');
+        }
+        
+        function simulatePlayerJoin() {
+            const mockPlayers = [
+                {
+                    id: 'player-1',
+                    socketId: gameClient.getSocketId(),
+                    name: 'Player 1',
+                    isReady: false,
+                    isHost: true,
+                    score: 0,
+                    currentHeight: null,
+                    isConnected: true
+                },
+                {
+                    id: 'player-2',
+                    socketId: 'socket-' + Math.random(),
+                    name: 'Player 2',
+                    isReady: false,
+                    isHost: false,
+                    score: 0,
+                    currentHeight: null,
+                    isConnected: true
+                }
+            ];
+            
+            stateManager.handlePlayerListUpdated(mockPlayers);
+            logEvent('Simulated player join', { count: mockPlayers.length });
+            updateStateDisplay();
+        }
+        
+        function simulateRoundStart() {
+            stateManager.handleRoundStarted({ roundNumber: 1, duration: 15 });
+            logEvent('Simulated round start');
+            updateStateDisplay();
+        }
+        
+        function simulateWallReveal() {
+            const results = [
+                {
+                    playerId: 'player-1',
+                    playerName: 'Player 1',
+                    selectedHeight: 5,
+                    wallHole: 5,
+                    pointsEarned: 20,
+                    totalScore: 20,
+                    result: 'perfect'
+                }
+            ];
+            
+            stateManager.handleWallRevealed({ holePosition: 5, results });
+            logEvent('Simulated wall reveal', { hole: 5 });
+            updateStateDisplay();
+        }
+        
+        function clearAllState() {
+            stateManager.clearState();
+            logEvent('State cleared');
+            updateStateDisplay();
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', initializeApp);
+    </script>
+</body>
+</html>
